@@ -1,0 +1,17 @@
+{
+    "hooks": [
+      {
+        "matcher": {
+          "events": ["PostToolUse"],
+          "tool_name": "Write",
+          "file_paths": ["docs/requirements.md"]
+        },
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '✅ Requirements ready. Next: /design [feature-name]'"
+          }
+        ]
+      }
+    ]
+  }
