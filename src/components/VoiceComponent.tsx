@@ -15,12 +15,20 @@ import PermissionModal from "@/components/PermissionModal";
 // Session Management
 import { SessionManager } from "@/lib/session-manager";
 
+// Enhanced Error Handling
+import { useConnectionErrorHandler } from "@/hooks/useErrorHandler";
+import { ErrorDisplay } from "@/components/ErrorDisplay";
+import { NetworkStatus } from "@/components/NetworkStatus";
+
 // UI
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Mic, MicOff, Volume2, VolumeX, AlertCircle, CheckCircle, Clock } from "lucide-react";
 
 const VoiceComponent = () => {
+  // Enhanced Error Handling
+  const errorHandler = useConnectionErrorHandler();
+  
   const [conversationState, setConversationState] = useState<ConversationState>({
     isActive: false,
     isListening: false,
@@ -239,22 +247,20 @@ const VoiceComponent = () => {
       }
     },
     onError: (error: string | Error) => {
-      const errorMessage = typeof error === "string" ? error : error.message;
       console.error("Conversation Error:", error);
       
-      setConversationState(prev => ({ ...prev, error: errorMessage }));
-      
-      // Handle session errors and potential reconnection
-      if (sessionManager.isActive() && sessionState.reconnectCount < 3) {
-        console.log('Attempting to reconnect session...');
-        sessionManager.reconnect().catch(reconnectError => {
-          console.error('Reconnection failed:', reconnectError);
-          setConversationState(prev => ({ 
-            ...prev, 
-            error: 'Connection lost. Please try again.' 
-          }));
+      // Use enhanced error handling with automatic retry for connection errors
+      errorHandler.handleConnectionError(error, async () => {
+        // Retry logic for reconnection
+        await sessionManager.reconnect();
+        await conversation.startSession({
+          agentId: process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID || 'default-agent-id'
         });
-      }
+      });
+      
+      // Update legacy error state for backward compatibility
+      const errorMessage = typeof error === "string" ? error : error.message;
+      setConversationState(prev => ({ ...prev, error: errorMessage }));
     },
   });
 
@@ -291,6 +297,12 @@ const VoiceComponent = () => {
       },
       onReconnect: (attempt) => {
         console.log(`Reconnection attempt ${attempt}`);
+        
+        // Handle reconnection with enhanced error system
+        if (attempt === 1) {
+          errorHandler.handleError('Connection lost. Attempting to reconnect...');
+        }
+        
         setConversationState(prev => ({ 
           ...prev, 
           error: `Reconnecting... (attempt ${attempt})` 
@@ -298,6 +310,17 @@ const VoiceComponent = () => {
       },
       onTimeout: () => {
         console.log('Session timeout');
+        
+        // Handle timeout with automatic retry
+        errorHandler.handleConnectionError('Connection timeout', async () => {
+          await sessionManager.reconnect();
+          if (status === 'connected') {
+            await conversation.startSession({
+              agentId: process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID || 'default-agent-id'
+            });
+          }
+        });
+        
         setConversationState(prev => ({ 
           ...prev, 
           error: 'Connection timeout. Please try again.' 
@@ -351,18 +374,24 @@ const VoiceComponent = () => {
     try {
       // Clear any previous errors
       setConversationState(prev => ({ ...prev, error: null }));
+      errorHandler.clearError();
       
-      // Start session (audio optimizations handled by configured microphone settings)
-      const conversationId = await conversation.startSession({
-        agentId: process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID || 'default-agent-id'
-      });
-      
-      console.log("Started conversation with optimized audio settings:", {
-        conversationId,
-        audioConfig,
-        microphoneOptimized: true
+      // Use enhanced error handling with retry for starting conversation
+      await errorHandler.executeWithRetry(async () => {
+        const conversationId = await conversation.startSession({
+          agentId: process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID || 'default-agent-id'
+        });
+        
+        console.log("Started conversation with optimized audio settings:", {
+          conversationId,
+          audioConfig,
+          microphoneOptimized: true
+        });
+        
+        return conversationId;
       });
     } catch (error) {
+      // Enhanced error handling will have already processed the error
       const errorMessage = error instanceof Error ? error.message : "Failed to start conversation";
       setConversationState(prev => ({ ...prev, error: errorMessage }));
       console.error("Error starting conversation:", error);
@@ -644,6 +673,26 @@ const VoiceComponent = () => {
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-4">
+      {/* Network Status Fallback */}
+      {errorHandler.fallbackState?.hasNetworkIssue && (
+        <NetworkStatus 
+          onRetryConnection={async () => {
+            try {
+              await errorHandler.executeWithRetry(async () => {
+                if (status !== 'connected') {
+                  await conversation.startSession({
+                    agentId: process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID || 'default-agent-id'
+                  });
+                }
+              });
+            } catch (error) {
+              console.error('Failed to reconnect:', error);
+            }
+          }}
+          isRetrying={errorHandler.isRetrying}
+        />
+      )}
+      
       {/* Permission Modal */}
       <PermissionModal
         isOpen={showPermissionModal}
@@ -977,8 +1026,21 @@ const VoiceComponent = () => {
               </div>
             )}
             
-            {/* Error Message */}
-            {conversationState.error && (
+            {/* Enhanced Error Display */}
+            {errorHandler.error && (
+              <ErrorDisplay
+                error={errorHandler.error}
+                isRetrying={errorHandler.isRetrying}
+                retryCount={errorHandler.retryCount}
+                fallbackState={errorHandler.fallbackState}
+                onRetry={errorHandler.retry}
+                onDismiss={errorHandler.clearError}
+                showDetails={process.env.NODE_ENV === 'development'}
+              />
+            )}
+            
+            {/* Legacy Error Message (for backward compatibility) */}
+            {conversationState.error && !errorHandler.error && (
               <p className="text-red-500 font-bold flex items-center justify-center gap-2">
                 <AlertCircle className="h-4 w-4" />
                 {conversationState.error}
