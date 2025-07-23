@@ -230,7 +230,7 @@ export class ErrorTestScenarios {
   // Development helper to add scenarios to window for manual testing
   static exposeForTesting(): void {
     if (process.env.NODE_ENV === 'development') {
-      (window as Record<string, unknown>).errorTestScenarios = {
+      (window as unknown as Record<string, unknown>).errorTestScenarios = {
         run: this.runScenario.bind(this),
         list: this.getAllScenarios.bind(this),
         suite: this.createTestSuite()

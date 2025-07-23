@@ -1,4 +1,5 @@
 import VoiceComponent from "@/components/VoiceComponent";
+import { PerformanceDashboard } from "@/components/PerformanceDashboard";
 
 export default function Home() {
   return (
@@ -31,6 +32,16 @@ export default function Home() {
         <div className="w-full max-w-2xl">
           <VoiceComponent />
         </div>
+        
+        {/* Performance Dashboard (Development Only) */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="w-full max-w-6xl mt-8">
+            <div className="bg-white/80 backdrop-blur-sm rounded-xl border border-gray-200/50 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Performance Monitoring</h2>
+              <PerformanceDashboard />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Enhanced Footer Information */}

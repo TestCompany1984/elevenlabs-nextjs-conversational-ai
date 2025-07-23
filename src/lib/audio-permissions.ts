@@ -117,6 +117,10 @@ export class AudioPermissionManager {
   }
 
   getBrowserSpecificInstructions(): string {
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+      return 'Please check your browser settings to allow microphone access for this site.';
+    }
+    
     const userAgent = navigator.userAgent.toLowerCase();
     
     if (userAgent.includes('chrome') || userAgent.includes('chromium')) {
@@ -133,6 +137,9 @@ export class AudioPermissionManager {
   }
 
   isHttpsRequired(): boolean {
+    if (typeof window === 'undefined' || typeof location === 'undefined') {
+      return false;
+    }
     return location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';
   }
 }

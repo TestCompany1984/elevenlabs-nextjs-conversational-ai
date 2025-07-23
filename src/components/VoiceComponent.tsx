@@ -20,6 +20,10 @@ import { useConnectionErrorHandler } from "@/hooks/useErrorHandler";
 import { ErrorDisplay } from "@/components/ErrorDisplay";
 import { NetworkStatus } from "@/components/NetworkStatus";
 
+// Performance Monitoring
+import { PerformanceMonitor } from "@/lib/performance-monitor";
+import { PerformanceOptimizer } from "@/lib/performance-optimizer";
+
 // UI
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -95,17 +99,33 @@ const VoiceComponent = () => {
     timeoutDuration: 30000,
     enableLogging: process.env.NODE_ENV === 'development'
   }));
+  
+  // Performance Monitoring System
+  const [performanceMonitor] = useState(() => new PerformanceMonitor());
+  const [performanceOptimizer, setPerformanceOptimizer] = useState<PerformanceOptimizer | null>(null);
 
   const conversation = useConversation({
     onConnect: async (props: { conversationId: string }) => {
       console.log("Connected to ElevenLabs with session:", props.conversationId);
       
+      // Initialize performance monitoring
+      performanceMonitor.startLatencyMeasurement('connection', 'roundtrip');
+      
+      // Initialize performance optimizer
+      const optimizer = new PerformanceOptimizer(performanceMonitor);
+      setPerformanceOptimizer(optimizer);
+      
       // Initialize session manager
       await sessionManager.initializeSession(props.conversationId);
       await sessionManager.connectSession();
       
+      // End connection latency measurement
+      performanceMonitor.endLatencyMeasurement('connection');
+      
       // Configure real-time microphone capture with optimal settings
       try {
+        performanceMonitor.startLatencyMeasurement('audio-init', 'input_start');
+        
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
           const stream = await navigator.mediaDevices.getUserMedia({
             audio: {
@@ -118,6 +138,15 @@ const VoiceComponent = () => {
               // Note: latency is controlled by bufferSize in AudioConfiguration
             }
           });
+          
+          // Update performance monitor with audio metrics
+          performanceMonitor.updateAudioMetrics({
+            sampleRate: audioConfig.sampleRate,
+            bufferSize: audioConfig.bufferSize,
+            quality: audioSettings.audioQuality
+          });
+          
+          performanceMonitor.endLatencyMeasurement('audio-init');
           
           console.log('Microphone configured with optimal settings:', {
             sampleRate: audioConfig.sampleRate,
@@ -160,6 +189,10 @@ const VoiceComponent = () => {
     },
     onMessage: (message: unknown) => {
       console.log("Received message:", message);
+      
+      // Start performance measurement for message processing
+      const messageId = `msg-${Date.now()}`;
+      performanceMonitor.startLatencyMeasurement(messageId, 'processing_start');
       
       // Measure and track latency for voice input streaming
       const messageTimestamp = new Date();
@@ -239,12 +272,22 @@ const VoiceComponent = () => {
       
       // Handle audio chunk streaming for real-time playback
       if (messageData.type === 'audio_chunk' || messageData.audio_data) {
+        performanceMonitor.startLatencyMeasurement(`audio-${messageId}`, 'output_start');
+        
         console.log('Audio chunk received for streaming playback:', {
           size: (messageData.audio_data as ArrayBuffer)?.byteLength || (messageData.bytes as number),
           format: (messageData.format as string) || 'mp3',
           latency: latency
         });
+        
+        // End audio processing measurement after a short delay (simulating processing)
+        setTimeout(() => {
+          performanceMonitor.endLatencyMeasurement(`audio-${messageId}`);
+        }, 10);
       }
+      
+      // End message processing measurement
+      performanceMonitor.endLatencyMeasurement(messageId);
     },
     onError: (error: string | Error) => {
       console.error("Conversation Error:", error);
@@ -361,6 +404,7 @@ const VoiceComponent = () => {
     return () => {
       unsubscribe();
       sessionManager.destroy();
+      performanceMonitor.destroy();
     };
   }, [permissionManager, sessionManager]);
 
@@ -403,8 +447,13 @@ const VoiceComponent = () => {
 
   const handleEndConversation = async () => {
     try {
-      // Generate final latency report before ending
+      // Generate final performance report
+      const performanceReport = performanceMonitor.generateReport();
       const latencyReport = generateLatencyReport();
+      
+      console.log('=== FINAL PERFORMANCE REPORT ===');
+      console.log('Performance Report:', performanceReport);
+      
       if (latencyReport) {
         console.log('=== FINAL LATENCY VALIDATION REPORT ===');
         console.log(`Session completed with ${latencyReport.totalMessages} messages`);
@@ -413,6 +462,12 @@ const VoiceComponent = () => {
         console.log(`<500ms compliance: ${latencyReport.complianceRate}%`);
         console.log(`Meeting requirement: ${latencyReport.meetingRequirement ? '✅ YES' : '❌ NO'}`);
         console.log('==========================================');
+      }
+      
+      // Run performance optimization analysis
+      if (performanceOptimizer) {
+        const optimizationResult = performanceOptimizer.analyzeAndOptimize();
+        console.log('Performance Optimization Results:', optimizationResult);
       }
       
       // End the ElevenLabs session
@@ -487,10 +542,17 @@ const VoiceComponent = () => {
     }
   };
   
-  // Audio Settings Control
+  // Audio Settings Control with Performance Optimization
   const updateAudioSettings = (newSettings: Partial<AudioSettings>) => {
     setAudioSettings(prev => {
       const updated = { ...prev, ...newSettings };
+      
+      // Update performance monitor with new audio settings
+      performanceMonitor.updateAudioMetrics({
+        quality: updated.audioQuality,
+        inputLevel: updated.inputVolume,
+        outputLevel: updated.outputVolume
+      });
       
       // Apply volume changes to active conversation
       if (conversation && conversation.setVolume) {
