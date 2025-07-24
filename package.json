@@ -6,7 +6,12 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "validate-env": "node scripts/validate-env.js",
+    "build:production": "npm run validate-env && npm run build",
+    "deploy:vercel": "npm run build:production && vercel --prod",
+    "health-check": "curl -f http://localhost:3000/api/health || exit 1",
+    "test:build": "npm run build && npm start & sleep 5 && npm run health-check && pkill -f 'npm start'"
   },
   "dependencies": {
     "@11labs/react": "^0.0.4",

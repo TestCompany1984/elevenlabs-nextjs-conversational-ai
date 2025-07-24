@@ -60,6 +60,17 @@ export interface PerformanceIssue {
   suggestions: string[];
 }
 
+/**
+ * PerformanceMonitor - Comprehensive performance monitoring and analysis system
+ * 
+ * Provides real-time monitoring of voice conversation performance including:
+ * - Latency measurement and validation (<500ms requirement)
+ * - Audio quality monitoring and dropout detection
+ * - Memory usage tracking and leak detection
+ * - Network performance analysis
+ * - Battery usage monitoring (mobile devices)
+ * - Performance issue analysis and recommendations
+ */
 export class PerformanceMonitor {
   private measurements: Map<string, LatencyMeasurement> = new Map();
   private metrics: Partial<PerformanceMetrics> = {};
@@ -107,6 +118,16 @@ export class PerformanceMonitor {
   }
 
   // Latency measurement methods
+  /**
+   * Starts a latency measurement for performance tracking
+   * 
+   * Initiates timing measurement for various voice conversation operations.
+   * Uses Performance API for high-precision measurements when available.
+   * 
+   * @param id - Unique identifier for this measurement
+   * @param type - Type of latency being measured (input, processing, output, roundtrip)
+   * @param details - Optional additional metadata for the measurement
+   */
   startLatencyMeasurement(id: string, type: LatencyMeasurement['type'], details?: Record<string, unknown>) {
     const measurement: LatencyMeasurement = {
       id,

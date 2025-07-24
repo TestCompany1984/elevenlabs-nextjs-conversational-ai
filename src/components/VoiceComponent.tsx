@@ -29,6 +29,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Mic, MicOff, Volume2, VolumeX, AlertCircle, CheckCircle, Clock } from "lucide-react";
 
+/**
+ * VoiceComponent - Main voice conversation interface component
+ * 
+ * This component provides a comprehensive voice AI assistant interface with real-time
+ * audio processing, conversation management, and advanced features including:
+ * - ElevenLabs SDK integration for voice conversations
+ * - Microphone permission management
+ * - Audio feedback prevention with smart muting
+ * - Performance monitoring and optimization
+ * - Error handling with automatic retry mechanisms
+ * - Cross-browser compatibility
+ * 
+ * @returns JSX.Element - The complete voice assistant interface
+ */
 const VoiceComponent = () => {
   // Enhanced Error Handling
   const errorHandler = useConnectionErrorHandler();

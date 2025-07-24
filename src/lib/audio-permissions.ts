@@ -1,5 +1,11 @@
 import { AudioPermissions } from "@/types";
 
+/**
+ * AudioPermissionManager - Manages microphone and speaker permissions
+ * 
+ * Provides comprehensive audio permission management with cross-browser compatibility,
+ * graceful error handling, and user-friendly permission request flows.
+ */
 export class AudioPermissionManager {
   private permissionStatus: AudioPermissions = {
     microphone: 'unknown',
@@ -8,6 +14,16 @@ export class AudioPermissionManager {
 
   private permissionChangeCallbacks: Array<(permissions: AudioPermissions) => void> = [];
 
+  /**
+   * Requests microphone permission from the user
+   * 
+   * Attempts to request microphone access using the MediaDevices API.
+   * Handles permission state tracking and provides detailed error messages
+   * for different failure scenarios.
+   * 
+   * @returns Promise<AudioPermissions> - Updated permission status
+   * @throws Error with user-friendly message on permission denial
+   */
   async requestMicrophonePermission(): Promise<AudioPermissions> {
     try {
       // Check if permissions API is available
